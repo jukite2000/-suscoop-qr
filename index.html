@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>수상한 QR | SUSCOOP</title>
+  
+  <!-- Fonts via Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=East+Sea+Dokdo&family=Gaegu:wght@700&family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --comic-black: #111214;
+      --comic-yellow: #fde047;
+      --comic-blue: #0d2a76;
+      --comic-red: #c51921;
+      --paper-bg: #fcfaf2; /* Vintage comic paper */
+      --text-dark: #111214;
+      --text-muted: #4b5563;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: #e2e8f0;
+      /* Comic halftone dot background */
+      background-image: radial-gradient(rgba(17, 18, 20, 0.15) 1.5px, transparent 1.5px);
+      background-size: 20px 20px;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+      font-family: 'Noto Sans KR', -apple-system, sans-serif;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Fullscreen canvas for particle hit effects */
+    #effect-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 99;
+    }
+
+    /* Floating Comic Pop Art elements in background */
+    .pop-item {
+      position: absolute;
+      font-family: 'East Sea Dokdo', cursive;
+      color: rgba(13, 42, 118, 0.12);
+      z-index: 2;
+      user-select: none;
+      pointer-events: none;
+    }
+
+    .pop-item-1 { top: 12%; left: 10%; font-size: 5rem; transform: rotate(-15deg); }
+    .pop-item-2 { bottom: 15%; left: 12%; font-size: 6rem; color: rgba(197, 25, 33, 0.12); transform: rotate(20deg); }
+    .pop-item-3 { top: 15%; right: 12%; font-size: 7rem; color: rgba(197, 25, 33, 0.12); transform: rotate(10deg); }
+    .pop-item-4 { bottom: 12%; right: 10%; font-size: 5.5rem; transform: rotate(-25deg); }
+
+    /* Comic Book Panel Frame */
+    .outer-frame {
+      background: var(--paper-bg);
+      border: 6px solid var(--comic-black);
+      padding: 28px 20px;
+      box-shadow: 12px 12px 0px var(--comic-black);
+      border-radius: 4px;
+      position: relative;
+      width: 100%;
+      max-width: 400px;
+      z-index: 10;
+      animation: frame-entrance 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+    }
+
+    @keyframes frame-entrance {
+      0% { transform: scale(0.9) rotate(-2deg); opacity: 0; }
+      100% { transform: scale(1) rotate(0deg); opacity: 1; }
+    }
+
+    /* Calligraphy Brush Title */
+    .brush-title {
+      font-family: 'East Sea Dokdo', cursive;
+      font-size: 4.8rem;
+      line-height: 0.9;
+      color: var(--comic-blue);
+      margin-bottom: 24px;
+      text-shadow: 3px 3px 0px rgba(197, 25, 33, 0.15);
+      letter-spacing: -1px;
+      text-align: center;
+    }
+
+    .brush-title span {
+      color: var(--comic-red);
+    }
+
+    /* Instruction Message Zone */
+    .instruction-zone {
+      margin-bottom: 24px;
+      z-index: 10;
+      text-align: center;
+    }
+
+    .main-message {
+      font-size: 1.45rem;
+      font-weight: 900;
+      color: var(--text-dark);
+      margin-bottom: 10px;
+      letter-spacing: -0.03em;
+      word-break: keep-all;
+      line-height: 1.35;
+    }
+
+    .sub-message {
+      font-size: 0.92rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      line-height: 1.5;
+      word-break: keep-all;
+    }
+
+    /* Interactive Game Area (Drag and Drop layout) */
+    .game-zone {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 10px;
+      margin-bottom: 28px;
+      z-index: 20;
+      position: relative;
+      background: rgba(0, 0, 0, 0.02);
+      border: 2px dashed rgba(0, 0, 0, 0.1);
+      border-radius: 8px;
+      height: 150px;
+    }
+
+    /* Draggable Thief Container */
+    .thief-drag-wrapper {
+      width: 80px;
+      height: 120px;
+      position: relative;
+      z-index: 30;
+      touch-action: none; /* Prevents mobile page scrolling while dragging */
+    }
+
+    .thief-character {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      filter: drop-shadow(4px 4px 0px rgba(0, 0, 0, 0.15));
+      cursor: grab;
+      user-select: none;
+      -webkit-user-drag: none;
+    }
+
+    .thief-character:active {
+      cursor: grabbing;
+    }
+
+    /* Drag Guide Arrow Line */
+    .drag-guide-arrow {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: var(--comic-black);
+      font-family: 'Gaegu', cursive;
+      font-size: 0.95rem;
+      font-weight: 700;
+      opacity: 0.6;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    .arrow-shaft {
+      width: 100%;
+      border-top: 3px dashed var(--comic-black);
+      position: relative;
+      margin-top: 4px;
+    }
+
+    .arrow-head {
+      position: absolute;
+      right: 0;
+      top: -6px;
+      width: 0;
+      height: 0;
+      border-top: 5px solid transparent;
+      border-bottom: 5px solid transparent;
+      border-left: 8px solid var(--comic-black);
+    }
+
+    /* Drop Zone Target: Locked Door */
+    .door-target {
+      width: 80px;
+      height: 110px;
+      position: relative;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .door-svg {
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+    }
+
+    /* Door leaf open transform origin (hinge on left) */
+    .door-leaf {
+      transform-origin: 10px 50px;
+      transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .door-target.opened .door-leaf {
+      transform: skewY(12deg) scaleX(0.15);
+    }
+
+    /* Padlock breaking off and falling */
+    .padlock {
+      transform-origin: center;
+      transition: transform 0.4s ease-in, opacity 0.3s ease-out;
+    }
+
+    .door-target.opened .padlock {
+      transform: translateY(60px) rotate(45deg);
+      opacity: 0;
+    }
+
+    /* Bold Flat Outlined Comic Buttons */
+    .btn-container {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      z-index: 20;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 16px 24px;
+      font-size: 1.15rem;
+      font-weight: 900;
+      cursor: pointer;
+      transition: all 0.15s;
+      border-radius: 8px;
+      outline: none;
+      letter-spacing: -0.02em;
+      border: 4px solid var(--comic-black);
+    }
+
+    .btn-yes {
+      background-color: var(--comic-yellow);
+      color: var(--comic-black);
+      box-shadow: 4px 4px 0px var(--comic-black);
+    }
+
+    .btn-yes:hover:not(:disabled) {
+      transform: translate(-2px, -2px);
+      box-shadow: 6px 6px 0px var(--comic-black);
+    }
+
+    .btn-yes:active:not(:disabled) {
+      transform: translate(2px, 2px);
+      box-shadow: 2px 2px 0px var(--comic-black);
+    }
+
+    .btn-yes:disabled {
+      background-color: #cbd5e1;
+      border-color: #94a3b8;
+      color: #64748b;
+      box-shadow: 4px 4px 0px #94a3b8;
+      cursor: not-allowed;
+    }
+
+    .btn-no {
+      background-color: #ffffff;
+      color: var(--text-muted);
+      box-shadow: 4px 4px 0px var(--comic-black);
+    }
+
+    .btn-no:hover {
+      background-color: #fafafa;
+      color: var(--text-dark);
+      box-shadow: 6px 6px 0px var(--comic-black);
+      transform: translate(-2px, -2px);
+    }
+
+    .btn-no:active {
+      transform: translate(2px, 2px);
+      box-shadow: 2px 2px 0px var(--comic-black);
+    }
+
+    /* Skip Link styling */
+    .skip-game-link {
+      margin-top: 24px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #71717a;
+      text-decoration: underline;
+      cursor: pointer;
+      z-index: 20;
+      transition: color 0.2s;
+      text-align: center;
+      display: block;
+      width: 100%;
+    }
+    .skip-game-link:hover {
+      color: var(--comic-red);
+    }
+
+    /* Fullscreen gate transition overlay */
+    .gate-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: #ffffff;
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.4s ease;
+    }
+
+    .gate-overlay.active {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .loading-container {
+      width: 200px;
+      height: 16px;
+      border: 4px solid var(--comic-black);
+      padding: 2px;
+      background: white;
+      margin-bottom: 16px;
+    }
+
+    .loading-bar {
+      height: 100%;
+      background: var(--comic-red);
+      width: 0%;
+      transition: width 1.2s ease-in-out;
+    }
+
+    .loading-text {
+      font-size: 1.15rem;
+      font-weight: 900;
+      color: var(--comic-red);
+      letter-spacing: -0.02em;
+    }
+
+    /* Cancel Safe Screen Zone */
+    .safe-zone {
+      display: none;
+      width: 100%;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+
+    /* Mobile adjustments */
+    @media (max-width: 480px) {
+      body { padding: 10px; }
+      .outer-frame { max-width: 300px; border-width: 5px; padding: 24px 16px; box-shadow: 8px 8px 0px var(--comic-black); }
+      .brush-title { font-size: 3.4rem; margin-bottom: 8px; }
+      .main-message { font-size: 1.15rem; }
+      .sub-message { font-size: 0.88rem; }
+      .btn { padding: 14px 18px; font-size: 0.95rem; border-width: 3px; }
+      .thief-drag-wrapper { width: 70px; height: 105px; }
+      .door-target { width: 70px; height: 95px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Comic Sunburst Background -->
+  <div class="sunburst-bg"></div>
+
+  <!-- Effect Canvas for Hits -->
+  <canvas id="effect-canvas"></canvas>
+
+  <!-- Floating Technical typographic tags in background -->
+  <div class="pop-item pop-item-1">수상한!</div>
+  <div class="pop-item pop-item-2">지갑조심!</div>
+  <div class="pop-item pop-item-3">QR</div>
+  <div class="pop-item pop-item-4">조심!</div>
+
+  <!-- Card Frame -->
+  <div class="outer-frame">
+    
+    <!-- Inner content area -->
+    <div class="inner-frame" id="main-content-frame" style="border: none; padding: 0;">
+      <!-- Calligraphy Brush Title -->
+      <div class="brush-title">수상한 <span>QR</span></div>
+
+      <!-- Game Instructions Zone -->
+      <div class="instruction-zone">
+        <div class="main-message" id="game-title">잠깐! 당신의 지갑 조심하세요! 🚨</div>
+        <div class="sub-message" id="game-desc">
+          도둑을 드래그해서 문에 가져다 놓으세요!<br>
+          안전하게 골인하면 입장 게이트가 열립니다.
+        </div>
+      </div>
+
+      <!-- Interactive Drag & Drop Game Zone -->
+      <div class="game-zone" id="game-arena">
+        <!-- Draggable Thief -->
+        <div class="thief-drag-wrapper" id="thief-drag">
+          <img src="thief.png" alt="Thief" class="thief-character" id="thief-img">
+        </div>
+
+        <!-- Drag guide indicator -->
+        <div class="drag-guide-arrow" id="drag-arrow">
+          <span>문으로 골인!</span>
+          <div class="arrow-shaft">
+            <div class="arrow-head"></div>
+          </div>
+        </div>
+
+        <!-- Drop Target: Locked Door -->
+        <div class="door-target" id="door-zone">
+          <svg class="door-svg" viewBox="0 0 100 120">
+            <!-- Closed Door frame drawing -->
+            <rect x="10" y="10" width="80" height="100" rx="4" fill="#a16207" stroke="var(--comic-black)" stroke-width="4" stroke-linejoin="round" />
+            
+            <!-- Door leaf (Opens on success) -->
+            <g class="door-leaf" id="door-leaf">
+              <rect x="10" y="10" width="80" height="100" rx="4" fill="#78350f" stroke="var(--comic-black)" stroke-width="3" />
+              <!-- Panel lines -->
+              <line x1="50" y1="10" x2="50" y2="110" stroke="var(--comic-black)" stroke-width="3" />
+              <!-- Door knob -->
+              <circle cx="25" cy="60" r="5" fill="#fde047" stroke="var(--comic-black)" stroke-width="2" />
+            </g>
+
+            <!-- Locked Padlock overlay (Fails on success) -->
+            <g class="padlock" id="door-lock">
+              <!-- Lock shackle -->
+              <path d="M 35,45 A 15,15 0 0 1 65,45 L 65,55 L 35,55 Z" fill="none" stroke="var(--comic-black)" stroke-width="4" />
+              <!-- Lock body -->
+              <rect x="30" y="52" width="40" height="30" rx="4" fill="#fbbf24" stroke="var(--comic-black)" stroke-width="4" />
+              <!-- Key hole -->
+              <circle cx="50" cy="65" r="3.5" fill="var(--comic-black)" />
+              <rect x="48" y="65" width="4" height="10" fill="var(--comic-black)" />
+            </g>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="btn-container">
+        <button class="btn btn-yes" id="btn-proceed" disabled>입장하기</button>
+        <button class="btn btn-no" id="btn-cancel">돌아가기</button>
+      </div>
+
+      <!-- Skip Button for quick entry -->
+      <span class="skip-game-link" id="btn-skip-game">건너뛰고 바로 입장하기 ➡️</span>
+    </div>
+
+    <!-- Safe Shield Cancel Screen -->
+    <div class="inner-frame safe-zone" id="safe-content-frame" style="border: none; padding: 0;">
+      <div class="brush-title" style="color:var(--comic-red);">지갑 <span>사수!</span></div>
+      <div class="instruction-zone" style="margin-top:20px; text-align: center;">
+        <div class="main-message" style="font-size:1.8rem; margin-bottom:15px; color:var(--comic-black);">지갑이 안전해졌습니다! 🛡️</div>
+        <div class="sub-message" style="font-size:1.05rem; line-height:1.6; margin-bottom:30px; color:var(--text-muted);">
+          안심하세요. 지갑 자금이 단 1원도 털리지 않았습니다.<br>
+          스마트폰의 창(X)을 닫거나 뒤로 돌아가셔도 좋습니다.
+        </div>
+      </div>
+      <button class="btn btn-yes" onclick="location.reload()" style="max-width:200px; margin: 0 auto;">처음으로</button>
+    </div>
+
+  </div>
+
+  <!-- Loading gate transition screen -->
+  <div class="gate-overlay" id="gate-overlay">
+    <div class="loading-container">
+      <div class="loading-bar" id="loading-bar"></div>
+    </div>
+    <div class="loading-text">지갑 조심하세요!</div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const targetUrl = 'https://smartstore.naver.com/suscoop?nl-ts-pid=jCMrAdqX5mhsslaJYbw-371836&tr=slsmn';
+      
+      const proceedBtn = document.getElementById('btn-proceed');
+      const cancelBtn = document.getElementById('btn-cancel');
+      const thiefWrapper = document.getElementById('thief-drag');
+      const thiefImg = document.getElementById('thief-img');
+      const doorZone = document.getElementById('door-zone');
+      const doorLeaf = document.getElementById('door-leaf');
+      const doorLock = document.getElementById('door-lock');
+      
+      const gameTitle = document.getElementById('game-title');
+      const gameDesc = document.getElementById('game-desc');
+      const dragArrow = document.getElementById('drag-arrow');
+      
+      const mainFrame = document.getElementById('main-content-frame');
+      const safeFrame = document.getElementById('safe-content-frame');
+
+      // Canvas setup for hit particle explosion
+      const canvas = document.getElementById('effect-canvas');
+      const ctx = canvas.getContext('2d');
+      let particles = [];
+
+      function resizeCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+      }
+      window.addEventListener('resize', resizeCanvas);
+      resizeCanvas();
+
+      class MoneyParticle {
+        constructor(x, y) {
+          this.x = x;
+          this.y = y;
+          this.size = Math.random() * 20 + 15;
+          this.speedX = (Math.random() - 0.5) * 14;
+          this.speedY = -(Math.random() * 10 + 4);
+          this.types = ['🪙', '💸', '✨', '🔥'];
+          this.type = this.types[Math.floor(Math.random() * this.types.length)];
+          this.opacity = 1;
+          this.rotation = Math.random() * 360;
+          this.rotationSpeed = (Math.random() - 0.5) * 5;
+          this.decay = Math.random() * 0.02 + 0.015;
+        }
+        update() {
+          this.x += this.speedX;
+          this.y += this.speedY;
+          this.speedY += 0.3; // Gravity
+          this.rotation += this.rotationSpeed;
+          this.opacity -= this.decay;
+        }
+        draw() {
+          ctx.save();
+          ctx.translate(this.x, this.y);
+          ctx.rotate((this.rotation * Math.PI) / 180);
+          ctx.globalAlpha = this.opacity;
+          ctx.font = `${this.size}px Arial`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(this.type, 0, 0);
+          ctx.restore();
+        }
+      }
+
+      function spawnParticles(x, y) {
+        for (let i = 0; i < 15; i++) {
+          particles.push(new MoneyParticle(x, y));
+        }
+      }
+
+      function animateParticles() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        particles = particles.filter(p => p.opacity > 0);
+        particles.forEach(p => {
+          p.update();
+          p.draw();
+        });
+        requestAnimationFrame(animateParticles);
+      }
+      animateParticles();
+
+      // Custom touch/mouse drag & drop implementation using Pointer Events
+      let isDragging = false;
+      let startX, startY;
+      let currentX = 0, currentY = 0;
+
+      thiefWrapper.addEventListener('pointerdown', (e) => {
+        isDragging = true;
+        startX = e.clientX - currentX;
+        startY = e.clientY - currentY;
+        thiefImg.style.cursor = 'grabbing';
+        thiefWrapper.style.transition = 'none';
+        thiefWrapper.setPointerCapture(e.pointerId);
+      });
+
+      thiefWrapper.addEventListener('pointermove', (e) => {
+        if (!isDragging) return;
+        currentX = e.clientX - startX;
+        currentY = e.clientY - startY;
+        
+        // Boundaries restriction relative to game arena
+        const arena = document.getElementById('game-arena').getBoundingClientRect();
+        const wrapperRect = thiefWrapper.getBoundingClientRect();
+        
+        thiefWrapper.style.transform = `translate(${currentX}px, ${currentY}px)`;
+      });
+
+      thiefWrapper.addEventListener('pointerup', (e) => {
+        if (!isDragging) return;
+        isDragging = false;
+        thiefWrapper.releasePointerCapture(e.pointerId);
+        thiefImg.style.cursor = 'grab';
+
+        // Check collision / distance to drop target
+        const thiefRect = thiefWrapper.getBoundingClientRect();
+        const doorRect = doorZone.getBoundingClientRect();
+
+        const thiefCenterX = thiefRect.left + thiefRect.width / 2;
+        const thiefCenterY = thiefRect.top + thiefRect.height / 2;
+        const doorCenterX = doorRect.left + doorRect.width / 2;
+        const doorCenterY = doorRect.top + doorRect.height / 2;
+
+        const distance = Math.hypot(thiefCenterX - doorCenterX, thiefCenterY - doorCenterY);
+
+        if (distance < 70) {
+          // Success drop!
+          thiefWrapper.style.display = 'none';
+          triggerSuccess();
+        } else {
+          // Bounce back to original position
+          thiefWrapper.style.transition = 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+          currentX = 0;
+          currentY = 0;
+          thiefWrapper.style.transform = 'translate(0px, 0px)';
+        }
+      });
+
+      function triggerSuccess() {
+        // 1. Break the lock (padlock slides down)
+        doorZone.classList.add('opened');
+        
+        // 2. Spawn gold particle burst at the door knob position
+        const doorRect = doorZone.getBoundingClientRect();
+        spawnParticles(doorRect.left + doorRect.width / 2, doorRect.top + doorRect.height / 2);
+
+        // 3. Update messages
+        gameTitle.innerText = "게이트 개방 완료! 🔓";
+        gameDesc.innerText = "잠금이 정상 해제되었습니다. 아래 버튼을 눌러 입장하세요!";
+        dragArrow.style.opacity = '0';
+
+        // 4. Enable proceed button
+        proceedBtn.removeAttribute('disabled');
+        proceedBtn.style.animation = 'button-pulse 1s infinite alternate';
+
+        // Dynamic button pulsing keyframe
+        const style = document.createElement('style');
+        style.innerHTML = `
+          @keyframes button-pulse {
+            0% { transform: scale(1); }
+            100% { transform: scale(1.03); }
+          }
+        `;
+        document.head.appendChild(style);
+      }
+
+      // Redirect triggers
+      function triggerRedirect() {
+        const overlay = document.getElementById('gate-overlay');
+        const bar = document.getElementById('loading-bar');
+        
+        overlay.classList.add('active');
+        setTimeout(() => {
+          bar.style.width = '100%';
+        }, 50);
+
+        setTimeout(() => {
+          window.location.href = targetUrl;
+        }, 1300);
+      }
+
+      proceedBtn.addEventListener('click', triggerRedirect);
+      document.getElementById('btn-skip-game').addEventListener('click', triggerRedirect);
+
+      // Cancel button triggers safe screen transition instead of buggy back redirects
+      cancelBtn.addEventListener('click', () => {
+        mainFrame.style.display = 'none';
+        safeFrame.style.display = 'flex';
+      });
+    });
+  </script>
+</body>
+</html>
